@@ -8,11 +8,14 @@ use Digitalize\Sms\Exceptions\TransportException;
 
 final class CurlTransport implements Transport
 {
-    public function send(string $method, string $url, array $headers, ?string $body, float $timeout, float $connectTimeout): Response
+    public function send(string $method, string $url, #[\SensitiveParameter] array $headers, ?string $body, float $timeout, float $connectTimeout): Response
     {
         $responseHeaders = [];
         $lines = [];
         foreach ($headers as $name => $value) {
+            if (preg_match("/[\r\n\0]/", $name . $value)) {
+                throw new \InvalidArgumentException("HTTP header {$name} contains a line break or NUL byte.");
+            }
             $lines[] = $name . ': ' . $value;
         }
 

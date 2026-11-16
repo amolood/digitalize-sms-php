@@ -32,6 +32,9 @@ final class MessagesResource
     public function send(int $templateId, string $phone, array $variables = [], ?string $idempotencyKey = null): Message
     {
         $idempotencyKey ??= 'sdk_' . bin2hex(random_bytes(16));
+        if (!preg_match('/^[A-Za-z0-9_.:-]{8,100}$/D', $idempotencyKey)) {
+            throw new \InvalidArgumentException('The idempotency key must be 8 to 100 characters of A-Z, a-z, 0-9, _ . : -');
+        }
 
         $payload = ['template_id' => $templateId, 'phone' => $phone];
         if ($variables !== []) {

@@ -219,7 +219,7 @@ final class ClientTest extends TestCase
     {
         $this->http->push(409, self::error('idempotency_request_in_progress'))->push(200, ['success' => true, 'data' => self::message()]);
 
-        $this->assertSame(5821, $this->client()->messages()->send(12, '0912345678', [], 'order-1')->id);
+        $this->assertSame(5821, $this->client()->messages()->send(12, '0912345678', [], 'order-1001')->id);
     }
 
     public function test_a_non_json_error_page_is_reported_clearly(): void
@@ -289,6 +289,46 @@ final class ClientTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new Client('pk_live_oops');
+    }
+
+    public function test_an_idempotency_key_outside_the_api_format_is_refused_before_sending(): void
+    {
+        foreach (["order-1\r\nX-Injected: 1", "short", str_repeat("a", 101), "has space 123"] as $bad) {
+            try {
+                $this->client()->messages()->send(12, "0912345678", [], $bad);
+                $this->fail("Accepted " . json_encode($bad));
+            } catch (\InvalidArgumentException) {
+            }
+        }
+        $this->assertSame([], $this->http->requests);
+    }
+
+    public function test_a_key_with_line_breaks_is_refused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new Client("sms_abc\r\nX-Injected: 1");
+    }
+
+    public function test_curl_transport_refuses_header_values_with_line_breaks(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        (new \Digitalize\Sms\Http\CurlTransport())->send("GET", "https://127.0.0.1:1/", ["X-Test" => "a\nb"], null, 1, 1);
+    }
+
+    public function test_the_key_does_not_appear_in_stack_traces(): void
+    {
+        $transport = new class implements \Digitalize\Sms\Http\Transport {
+            public function send(string $method, string $url, #[\SensitiveParameter] array $headers, ?string $body, float $timeout, float $connectTimeout): \Digitalize\Sms\Http\Response
+            {
+                throw new TransportException("down");
+            }
+        };
+
+        try {
+            (new Client(self::KEY, ["transport" => $transport, "max_retries" => 0]))->account()->get();
+        } catch (TransportException $e) {
+            $this->assertStringNotContainsString(self::KEY, print_r($e->getTrace(), true));
+        }
     }
 
     public function test_the_key_is_hidden_from_dumps(): void

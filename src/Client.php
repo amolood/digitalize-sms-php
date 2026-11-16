@@ -24,7 +24,7 @@ use Digitalize\Sms\Resources\TemplatesResource;
  */
 final class Client
 {
-    public const VERSION = '1.0.0';
+    public const VERSION = '1.0.1';
     public const DEFAULT_BASE_URL = 'https://digitalize.sd/api/v1/sms';
 
     private readonly string $baseUrl;
@@ -60,7 +60,7 @@ final class Client
         #[\SensitiveParameter] private readonly string $apiKey,
         array $options = [],
     ) {
-        if (!str_starts_with($apiKey, 'sms_')) {
+        if (!preg_match('/^sms_[A-Za-z0-9]+$/D', $apiKey)) {
             throw new \InvalidArgumentException('The Digitalize SMS API key must start with "sms_". Create one at https://digitalize.sd/sms/api-keys');
         }
 
@@ -111,7 +111,7 @@ final class Client
      * @throws ApiException
      * @throws TransportException
      */
-    public function request(string $method, string $path, array $query = [], ?array $json = null, array $headers = []): Response
+    public function request(string $method, string $path, array $query = [], ?array $json = null, #[\SensitiveParameter] array $headers = []): Response
     {
         $url = $this->baseUrl . '/' . ltrim($path, '/');
         $query = array_filter($query, static fn ($value) => $value !== null && $value !== '');
